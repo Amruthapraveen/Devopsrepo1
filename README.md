@@ -1,6 +1,6 @@
 # Devopsrepo1
 
-Terraform is applied through GitHub Actions using AWS IAM OIDC.
+Terraform is applied through GitHub Actions using AWS IAM OIDC..
 
 ## GitHub configuration
 
