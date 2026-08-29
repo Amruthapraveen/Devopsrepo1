@@ -1,119 +1,43 @@
-name: Create EC2 Instance (using inputs)
+name: Terraform Apply
 
 on:
   workflow_dispatch:
-    inputs:
-      ami:
-        description: 'AMI id (required)'
-        required: true
-        default: 'ami-0abcdef1234567890'
-      instance_type:
-        description: 'EC2 Instance type'
-        required: false
-        default: 't2.micro'
-      key_name:
-        description: 'Key pair name (optional)'
-        required: false
-        default: ''
-      subnet_id:
-        description: 'Subnet id (optional)'
-        required: false
-        default: ''
-      sg_ids:
-        description: 'Comma-separated security group ids (optional)'
-        required: false
-        default: ''
-      region:
-        description: 'AWS region'
-        required: false
-        default: 'ap-south-1'
-
-permissions:
-  contents: read
+  push:
+    branches:
+      - bhaskar
+      - main
 
 jobs:
-  create-ec2:
+  terraform:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Debug runner / aws version
-        run: |
-          echo "Runner info:"
-          uname -a
-          echo "Python/which pip:"
-          python3 --version || true
-          pip3 --version || true
-          echo "aws --version (if installed)"
-          aws --version || true
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Check AWS secrets are set
-        run: |
-          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID || '' }}" ] || [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY || '' }}" ]; then
-            echo "AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY secret is missing"
-            exit 1
-          fi
-          echo "AWS secrets appear to be set"
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.5.0"
 
-      - name: Configure AWS credentials (secrets)
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ github.event.inputs.region || vars.AWS_REGION || 'ap-south-1' }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Create EC2 instance (aws cli)
-        id: create-ec2
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform plan
         env:
-          AMI: ${{ github.event.inputs.ami }}
-          INSTANCE_TYPE: ${{ github.event.inputs.instance_type }}
-          KEY_NAME: ${{ github.event.inputs.key_name }}
-          SUBNET_ID: ${{ github.event.inputs.subnet_id }}
-          SG_IDS: ${{ github.event.inputs.sg_ids }}
-        run: |
-          set -euo pipefail
-          echo "Using AMI: $AMI"
-          echo "Instance type: $INSTANCE_TYPE"
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+     
+        run: terraform plan -out=tfplan
 
-          ARGS=(--image-id "$AMI" --count 1 --instance-type "$INSTANCE_TYPE")
-
-          if [ -n "$KEY_NAME" ]; then
-            ARGS+=(--key-name "$KEY_NAME")
-          fi
-
-          if [ -n "$SUBNET_ID" ]; then
-            ARGS+=(--subnet-id "$SUBNET_ID")
-          fi
-
-          if [ -n "$SG_IDS" ]; then
-            IFS=',' read -ra SG_ARR <<< "$SG_IDS"
-            for sg in "${SG_ARR[@]}"; do
-              ARGS+=(--security-group-ids "$sg")
-            done
-          fi
-
-          ARGS+=(--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=github-actions-ec2}]')
-
-          echo "Running: aws ec2 run-instances ${ARGS[*]}"
-          INSTANCE_ID=$(aws ec2 run-instances "${ARGS[@]}" --query 'Instances[0].InstanceId' --output text) || true
-
-          echo "raw INSTANCE_ID: '$INSTANCE_ID'"
-          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "Failed to create instance or no instance id returned"
-            exit 1
-          fi
-
-          echo "Created instance: $INSTANCE_ID"
-          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
-
-      - name: Wait for instance to be running
-        if: always()
-        run: |
-          # read instance id from step output (expanded at runtime)
-          INSTANCE_ID="${{ steps.create-ec2.outputs.instance_id || '' }}"
-          if [ -z "$INSTANCE_ID" ]; then
-            echo "No instance id available from previous step outputs; skipping wait"
-            exit 0
-          fi
-          echo "Waiting for instance $INSTANCE_ID to reach 'running'"
-          aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" || true
-          echo "Wait finished (or timed out)."
+      - name: Terraform apply
+        env:
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+   
+        run: terraform apply -auto-approve tfplan
