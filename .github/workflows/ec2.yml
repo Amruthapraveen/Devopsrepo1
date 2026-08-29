@@ -1,7 +1,32 @@
-name: Create EC2 Instance (using secrets)
+name: Create EC2 Instance (using inputs)
 
 on:
   workflow_dispatch:
+    inputs:
+      ami:
+        description: 'AMI id (required)'
+        required: true
+        default: 'ami-0abcdef1234567890'
+      instance_type:
+        description: 'EC2 Instance type'
+        required: false
+        default: 't2.micro'
+      key_name:
+        description: 'Key pair name (optional)'
+        required: false
+        default: ''
+      subnet_id:
+        description: 'Subnet id (optional)'
+        required: false
+        default: ''
+      sg_ids:
+        description: 'Comma-separated security group ids (optional)'
+        required: false
+        default: ''
+      region:
+        description: 'AWS region'
+        required: false
+        default: 'ap-south-1'
 
 permissions:
   contents: read
@@ -11,19 +36,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Debug runner / aws version
+        run: |
+          echo "Runner info:"
+          uname -a
+          echo "Python/which pip:"
+          python3 --version || true
+          pip3 --version || true
+          echo "aws --version (if installed)"
+          aws --version || true
+
+      - name: Check AWS secrets are set
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID || '' }}" ] || [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY || '' }}" ]; then
+            echo "AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY secret is missing"
+            exit 1
+          fi
+          echo "AWS secrets appear to be set"
+
       - name: Configure AWS credentials (secrets)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
+          aws-region: ${{ github.event.inputs.region || vars.AWS_REGION || 'ap-south-1' }}
 
       - name: Create EC2 instance (aws cli)
         id: create-ec2
         env:
-          AMI: 'ami-0abcdef1234567890'
-          INSTANCE_TYPE: 't2.micro'
-
+          AMI: ${{ github.event.inputs.ami }}
+          INSTANCE_TYPE: ${{ github.event.inputs.instance_type }}
+          KEY_NAME: ${{ github.event.inputs.key_name }}
+          SUBNET_ID: ${{ github.event.inputs.subnet_id }}
+          SG_IDS: ${{ github.event.inputs.sg_ids }}
         run: |
           set -euo pipefail
           echo "Using AMI: $AMI"
@@ -48,9 +93,10 @@ jobs:
 
           ARGS+=(--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=github-actions-ec2}]')
 
-          echo "Running: aws ec2 run-instances ..."
-          INSTANCE_ID=$(aws ec2 run-instances "${ARGS[@]}" --query 'Instances[0].InstanceId' --output text)
+          echo "Running: aws ec2 run-instances ${ARGS[*]}"
+          INSTANCE_ID=$(aws ec2 run-instances "${ARGS[@]}" --query 'Instances[0].InstanceId' --output text) || true
 
+          echo "raw INSTANCE_ID: '$INSTANCE_ID'"
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
             echo "Failed to create instance or no instance id returned"
             exit 1
@@ -62,10 +108,12 @@ jobs:
       - name: Wait for instance to be running
         if: always()
         run: |
-          if [ -n "${{ steps.create-ec2.outputs.instance_id || '' }}" ]; then
-            INSTANCE_ID=${{ steps.create-ec2.outputs.instance_id }}
-          else
+          # read instance id from step output (expanded at runtime)
+          INSTANCE_ID="${{ steps.create-ec2.outputs.instance_id || '' }}"
+          if [ -z "$INSTANCE_ID" ]; then
             echo "No instance id available from previous step outputs; skipping wait"
             exit 0
           fi
+          echo "Waiting for instance $INSTANCE_ID to reach 'running'"
           aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" || true
+          echo "Wait finished (or timed out)."
