@@ -2,16 +2,6 @@ name: Create EC2 Instance (using secrets)
 
 on:
   workflow_dispatch:
-    inputs:
-      ami:
-        description: 'AMI ID to launch'
-        required: true
-        default: 'ami-0abcdef1234567890'
-      instance_type:
-        description: 'EC2 instance type'
-        required: true
-        default: 't2.micro'
-
 
 permissions:
   contents: read
@@ -31,8 +21,8 @@ jobs:
       - name: Create EC2 instance (aws cli)
         id: create-ec2
         env:
-          AMI: ${{ github.event.inputs.ami }}
-          INSTANCE_TYPE: ${{ github.event.inputs.instance_type }}
+          AMI: 'ami-0abcdef1234567890'
+          INSTANCE_TYPE: 't2.micro'
 
         run: |
           set -euo pipefail
