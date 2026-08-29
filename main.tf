@@ -44,7 +44,7 @@ data "aws_subnets" "default" {
 
 data "aws_ami" "amazon_linux" {
 	most_recent = true
-	owners      = ["918734735613"]
+	owners      = ["amazon"]
 
 	filter {
 		name   = "name"
@@ -58,7 +58,7 @@ data "aws_ami" "amazon_linux" {
 }
 
 resource "aws_instance" "this" {
-	ami                         = "resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+	ami                         = data.aws_ami.amazon_linux.id
 	instance_type               = var.instance_type
 	key_name                    = var.key_name
 	associate_public_ip_address = true
