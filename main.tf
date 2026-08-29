@@ -22,7 +22,12 @@ variable "aws_region" {
 variable "instance_type" {
 	description = "EC2 instance type."
 	type        = string
-	default     = "t2.micro"
+	default     = "t3.micro"
+
+	validation {
+		condition     = !(startswith(var.instance_type, "t4g") || startswith(var.instance_type, "a1"))
+		error_message = "Selected instance type appears to be ARM-only (t4g, a1). Choose an x86_64 instance type such as t3.micro for the selected AMI."
+	}
 }
 
 variable "key_name" {
@@ -54,6 +59,11 @@ data "aws_ami" "amazon_linux" {
 	filter {
 		name   = "virtualization-type"
 		values = ["hvm"]
+	}
+
+	filter {
+		name   = "architecture"
+		values = ["x86_64"]
 	}
 }
 
