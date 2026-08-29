@@ -28,10 +28,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
 
-      - name: Debug: show caller identity
-        run: |
-          aws sts get-caller-identity || true
-
       - name: Create EC2 instance (aws cli)
         id: create-ec2
         env:
