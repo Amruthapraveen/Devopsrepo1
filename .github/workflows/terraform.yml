@@ -1,44 +1,99 @@
-name: Terraform
- 
+name: Create EC2 Instance (using secrets)
+
 on:
-  pull_request:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      ami:
+        description: 'AMI ID to launch'
+        required: true
+        default: 'ami-0abcdef1234567890'
+      instance_type:
+        description: 'EC2 instance type'
+        required: true
+        default: 't2.micro'
+      key_name:
+        description: 'Key pair name (leave empty to skip)'
+        required: false
+        default: ''
+      subnet_id:
+        description: 'Subnet ID (optional)'
+        required: false
+        default: ''
+      security_group_ids:
+        description: 'Comma-separated security group IDs (optional)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  terraform:
+  create-ec2:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (secrets)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN || '' }}
           aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Debug: show caller identity
+        run: |
+          aws sts get-caller-identity || true
 
-      - name: Terraform init
-        run: terraform init
+      - name: Create EC2 instance (aws cli)
+        id: create-ec2
+        env:
+          AMI: ${{ github.event.inputs.ami }}
+          INSTANCE_TYPE: ${{ github.event.inputs.instance_type }}
+          KEY_NAME: ${{ github.event.inputs.key_name }}
+          SUBNET_ID: ${{ github.event.inputs.subnet_id }}
+          SG_IDS: ${{ github.event.inputs.security_group_ids }}
+        run: |
+          set -euo pipefail
+          echo "Using AMI: $AMI"
+          echo "Instance type: $INSTANCE_TYPE"
 
-      - name: Terraform format check
-        run: terraform fmt -check
+          ARGS=(--image-id "$AMI" --count 1 --instance-type "$INSTANCE_TYPE")
 
-      - name: Terraform validate
-        run: terraform validate
+          if [ -n "$KEY_NAME" ]; then
+            ARGS+=(--key-name "$KEY_NAME")
+          fi
 
-      - name: Terraform plan
-        run: terraform plan -out=tfplan
+          if [ -n "$SUBNET_ID" ]; then
+            ARGS+=(--subnet-id "$SUBNET_ID")
+          fi
 
-      - name: Terraform apply
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve tfplan
+          if [ -n "$SG_IDS" ]; then
+            IFS=',' read -ra SG_ARR <<< "$SG_IDS"
+            for sg in "${SG_ARR[@]}"; do
+              ARGS+=(--security-group-ids "$sg")
+            done
+          fi
+
+          ARGS+=(--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=github-actions-ec2}]')
+
+          echo "Running: aws ec2 run-instances ..."
+          INSTANCE_ID=$(aws ec2 run-instances "${ARGS[@]}" --query 'Instances[0].InstanceId' --output text)
+
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+            echo "Failed to create instance or no instance id returned"
+            exit 1
+          fi
+
+          echo "Created instance: $INSTANCE_ID"
+          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for instance to be running
+        if: always()
+        run: |
+          if [ -n "${{ steps.create-ec2.outputs.instance_id || '' }}" ]; then
+            INSTANCE_ID=${{ steps.create-ec2.outputs.instance_id }}
+          else
+            echo "No instance id available from previous step outputs; skipping wait"
+            exit 0
+          fi
+          aws ec2 wait instance-running --instance-ids "$INSTANCE_ID" || true
