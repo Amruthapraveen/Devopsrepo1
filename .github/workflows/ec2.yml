@@ -11,18 +11,7 @@ on:
         description: 'EC2 instance type'
         required: true
         default: 't2.micro'
-      key_name:
-        description: 'Key pair name (leave empty to skip)'
-        required: false
-        default: ''
-      subnet_id:
-        description: 'Subnet ID (optional)'
-        required: false
-        default: ''
-      security_group_ids:
-        description: 'Comma-separated security group IDs (optional)'
-        required: false
-        default: ''
+
 
 permissions:
   contents: read
