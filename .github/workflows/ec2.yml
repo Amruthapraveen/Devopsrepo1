@@ -1,76 +1,35 @@
-name: Terraform Apply
+name: Terraform Plan
 
 on:
   workflow_dispatch:
-    inputs:
-      ami_id:
-        description: 'AMI ID to use (overrides environment/secret)'
-        required: false
-        default: ''
-      instance_type:
-        description: 'EC2 instance type'
-        required: false
-        default: 't2.micro'
-      key_name:
-        description: 'SSH key pair name (optional)'
-        required: false
-        default: ''
-      ssh_user:
-        description: 'SSH user for the AMI (e.g., ec2-user, ubuntu)'
-        required: false
-        default: 'ec2-user'
-  push:
-    branches:
-      - bhaskar
-      - main
+
+permissions:
+  contents: read
 
 jobs:
-  terraform:
+  plan:
     runs-on: ubuntu-latest
-    # Use the GitHub Environment named `dev` so you can supply environment-specific secrets/variables there
-    environment: dev
-
-    # Prefer workflow inputs, then repository variables (vars), then secrets. Falls back to sensible defaults where applicable.
-    env:
-      TF_VAR_aws_region: ${{ inputs.aws_region || vars.AWS_REGION || secrets.AWS_REGION || 'us-east-1' }}
-      TF_VAR_ami_id: ${{ inputs.ami_id || vars.AMI_ID || secrets.AMI_ID || '' }}
-      TF_VAR_instance_type: ${{ inputs.instance_type || vars.INSTANCE_TYPE || secrets.INSTANCE_TYPE || 't2.micro' }}
-      TF_VAR_key_name: ${{ inputs.key_name || vars.KEY_NAME || secrets.KEY_NAME || '' }}
-      TF_VAR_ssh_user: ${{ inputs.ssh_user || vars.SSH_USER || secrets.SSH_USER || 'ec2-user' }}
-      TF_VAR_security_group_ids: ${{ vars.SECURITY_GROUP_IDS || secrets.SECURITY_GROUP_IDS || '' }}
-      TF_VAR_subnet_id: ${{ vars.SUBNET_ID || secrets.SUBNET_ID || '' }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: "1.5.0"
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Configure AWS credentials (secrets)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.TF_VAR_aws_region }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.5.0"
 
       - name: Terraform init
         run: terraform init
 
       - name: Terraform plan
-        run: terraform plan -out=tfplan
-
-      - name: Terraform apply
-        run: terraform apply -auto-approve tfplan
-
-      - name: Show created EC2 (if any) - informational
-        if: always()
         run: |
-          if command -v aws >/dev/null 2>&1; then
-            echo "Listing EC2 instances in region ${TF_VAR_aws_region} (may be empty):"
-            aws ec2 describe-instances --region "${TF_VAR_aws_region}" --filters Name=image-id,Values="${TF_VAR_ami_id}" || true
-          else
-            echo "aws cli not available in runner."
-          fi
+          terraform plan -no-color -out=tfplan || true
+          terraform show -no-color tfplan || true
