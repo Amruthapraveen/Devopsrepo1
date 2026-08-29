@@ -21,7 +21,7 @@ jobs:
       - name: Create EC2 instance (aws cli)
         id: create-ec2
         env:
-          AMI: 'ami-0abcdef1234567890'
+          AMI: 'ami-918734735613'
           INSTANCE_TYPE: 't2.micro'
           AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
 
