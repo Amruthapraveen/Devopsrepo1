@@ -33,9 +33,7 @@ jobs:
         env:
           AMI: ${{ github.event.inputs.ami }}
           INSTANCE_TYPE: ${{ github.event.inputs.instance_type }}
-          KEY_NAME: ${{ github.event.inputs.key_name }}
-          SUBNET_ID: ${{ github.event.inputs.subnet_id }}
-          SG_IDS: ${{ github.event.inputs.security_group_ids }}
+
         run: |
           set -euo pipefail
           echo "Using AMI: $AMI"
