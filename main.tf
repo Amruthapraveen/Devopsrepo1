@@ -31,9 +31,9 @@ variable "instance_type" {
 }
 
 variable "key_name" {
-	description = "Existing EC2 key pair name. Leave null to create the instance without SSH key authentication."
+	description = "Existing EC2 key pair name. Leave empty to create the instance without SSH key authentication."
 	type        = string
-	default     = null
+	default     = ""
 }
 
 data "aws_vpc" "default" {
@@ -47,13 +47,16 @@ data "aws_subnets" "default" {
 	}
 }
 
+# Use a widely-available Amazon Linux 2 AMI name pattern (x86_64) so the data lookup
+# is less likely to fail across regions. If you specifically need Amazon Linux 2023,
+# replace the name pattern with the appropriate regional AMI name.
 data "aws_ami" "amazon_linux" {
 	most_recent = true
 	owners      = ["amazon"]
 
 	filter {
 		name   = "name"
-		values = ["al2023-ami-*-x86_64"]
+		values = ["amzn2-ami-hvm-*-x86_64-gp2"]
 	}
 
 	filter {
@@ -71,7 +74,7 @@ resource "aws_instance" "this" {
 	ami                         = data.aws_ami.amazon_linux.id
 	instance_type               = var.instance_type
 	subnet_id                   = data.aws_subnets.default.ids[0]
-	key_name                    = var.key_name
+	key_name                    = var.key_name != "" ? var.key_name : null
 	associate_public_ip_address = true
 
 	tags = {
