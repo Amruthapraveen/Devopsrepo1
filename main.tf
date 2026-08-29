@@ -44,11 +44,11 @@ data "aws_subnets" "default" {
 
 data "aws_ami" "amazon_linux" {
 	most_recent = true
-	owners      = ["amazon"]
+	owners      = ["918734735613"]
 
 	filter {
 		name   = "name"
-		values = ["al2023-ami-*-x86_64"]
+		values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
 	}
 
 	filter {
@@ -58,9 +58,8 @@ data "aws_ami" "amazon_linux" {
 }
 
 resource "aws_instance" "this" {
-	ami                         = data.aws_ami.amazon_linux.id
+	ami                         = "resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
 	instance_type               = var.instance_type
-	subnet_id                   = data.aws_subnets.default.ids[0]
 	key_name                    = var.key_name
 	associate_public_ip_address = true
 
