@@ -28,18 +28,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
 
-      - name: Debug: show caller identity
-        run: |
-          aws sts get-caller-identity || true
-
       - name: Create EC2 instance (aws cli)
         id: create-ec2
         env:
           AMI: ${{ github.event.inputs.ami }}
           INSTANCE_TYPE: ${{ github.event.inputs.instance_type }}
-          KEY_NAME: ${{ github.event.inputs.key_name }}
-          SUBNET_ID: ${{ github.event.inputs.subnet_id }}
-          SG_IDS: ${{ github.event.inputs.security_group_ids }}
+
         run: |
           set -euo pipefail
           echo "Using AMI: $AMI"
