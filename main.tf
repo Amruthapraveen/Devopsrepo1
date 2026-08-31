@@ -75,12 +75,3 @@ resource "aws_instance" "example" {
   }
 }
 
-output "instance_id" {
-	description = "Created EC2 instance ID."
-	value       = aws_instance.this.id
-}
-
-output "public_ip" {
-	description = "Public IPv4 address of the EC2 instance."
-	value       = aws_instance.this.public_ip
-}
