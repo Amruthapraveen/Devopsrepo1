@@ -22,13 +22,18 @@ variable "aws_region" {
 variable "instance_type" {
 	description = "EC2 instance type."
 	type        = string
-	default     = "t3.micro"
+	default     = "t2.micro"
+
+	validation {
+		condition     = !(startswith(var.instance_type, "t4g") || startswith(var.instance_type, "a1"))
+		error_message = "Selected instance type appears to be ARM-only (t4g, a1). Choose an x86_64 instance type such as t3.micro for the selected AMI."
+	}
 }
 
 variable "key_name" {
-	description = "Existing EC2 key pair name. Leave null to create the instance without SSH key authentication."
+	description = "Existing EC2 key pair name. Leave empty to create the instance without SSH key authentication."
 	type        = string
-	default     = null
+	default     = ""
 }
 
 data "aws_vpc" "default" {
@@ -42,25 +47,32 @@ data "aws_subnets" "default" {
 	}
 }
 
+# Use a widely-available Amazon Linux 2 AMI name pattern (x86_64) so the data lookup
+# is less likely to fail across regions. If you specifically need Amazon Linux 2023,
+# replace the name pattern with the appropriate regional AMI name.
 data "aws_ami" "amazon_linux" {
 	most_recent = true
 	owners      = ["amazon"]
 
 	filter {
 		name   = "name"
-		values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+		values = ["amzn2-ami-hvm-*-x86_64-gp2"]
 	}
 
 	filter {
 		name   = "virtualization-type"
 		values = ["hvm"]
 	}
+
+	filter {
+		name   = "architecture"
+		values = ["x86_64"]
+	}
 }
 
 resource "aws_instance" "this" {
-	ami                         = data.aws_ami.amazon_linux.id
-	instance_type               = var.instance_type
-	key_name                    = var.key_name
+	ami                         = "ami-918734735613"
+	instance_type = "t2.micro"
 	associate_public_ip_address = true
 
 	tags = {
