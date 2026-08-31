@@ -50,35 +50,29 @@ data "aws_subnets" "default" {
 # Use a widely-available Amazon Linux 2 AMI name pattern (x86_64) so the data lookup
 # is less likely to fail across regions. If you specifically need Amazon Linux 2023,
 # replace the name pattern with the appropriate regional AMI name.
-data "aws_ami" "amazon_linux" {
-	most_recent = true
-	owners      = ["amazon"]
+data "aws_ami" "ubuntu" {
+  most_recent = true
 
-	filter {
-		name   = "name"
-		values = ["amzn2-ami-hvm-*-x86_64-gp2"]
-	}
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
 
-	filter {
-		name   = "virtualization-type"
-		values = ["hvm"]
-	}
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
 
-	filter {
-		name   = "architecture"
-		values = ["x86_64"]
-	}
+  owners = ["099720109477"] # Canonical
 }
 
-resource "aws_instance" "this" {
-	ami                         = data.aws_ami.amazon_linux.id
-	instance_type               = "t2.micro"
-	associate_public_ip_address = true
+resource "aws_instance" "example" {
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = "t3.micro"
 
-	tags = {
-		Name        = "terraform-ec2"
-		Environment = "dev"
-	}
+  tags = {
+    Name = "HelloWorld"
+  }
 }
 
 output "instance_id" {
