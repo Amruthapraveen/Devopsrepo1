@@ -22,7 +22,7 @@ variable "aws_region" {
 variable "instance_type" {
 	description = "EC2 instance type."
 	type        = string
-	default     = "t3.micro"
+	default     = "t2.micro"
 
 	validation {
 		condition     = !(startswith(var.instance_type, "t4g") || startswith(var.instance_type, "a1"))
@@ -71,10 +71,8 @@ data "aws_ami" "amazon_linux" {
 }
 
 resource "aws_instance" "this" {
-	ami                         = data.aws_ami.amazon_linux.id
-	instance_type               = var.instance_type
-	subnet_id                   = data.aws_subnets.default.ids[0]
-	key_name                    = var.key_name != "" ? var.key_name : null
+	ami                         = "ami-918734735613"
+	instance_type = "t2.micro"
 	associate_public_ip_address = true
 
 	tags = {
