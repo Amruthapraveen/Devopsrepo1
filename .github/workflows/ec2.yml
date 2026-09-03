@@ -29,7 +29,7 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
     # Use the GitHub Environment named `dev` so you can supply environment-specific secrets/variables there
-    environment: dev
+    environment: Dev 1
 
     # Prefer workflow inputs, then repository variables (vars), then secrets. Falls back to sensible defaults where applicable.
     env:
