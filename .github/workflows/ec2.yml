@@ -21,9 +21,7 @@ on:
         default: 'ec2-user'
   push:
     branches:
-      - bhaskar
-      - main
-      -Ec2-Branch
+      - Ec2-Branch
 
 jobs:
   terraform:
