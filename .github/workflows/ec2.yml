@@ -10,7 +10,7 @@ on:
       instance_type:
         description: 'EC2 instance type'
         required: false
-        default: 't2.micro'
+        default: 't3.micro'
       key_name:
         description: 'SSH key pair name (optional)'
         required: false
@@ -23,6 +23,7 @@ on:
     branches:
       - bhaskar
       - main
+      -Ec2-Branch
 
 jobs:
   terraform:
