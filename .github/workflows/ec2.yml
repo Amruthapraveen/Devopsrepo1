@@ -21,7 +21,7 @@ on:
         default: 'ec2-user'
   push:
     branches:
-      - Ec2-Branch
+      - feature/*
 
 jobs:
   terraform:
